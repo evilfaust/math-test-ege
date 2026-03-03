@@ -6,7 +6,7 @@ import {
 import { pb, type Student, type Exam, type StudentResult, type StudentAnswer, type ExamTask, examUrl, problemUrl, filterIn } from '../lib/pb'
 import GradeCell from '../components/GradeCell'
 import StudentExamModal from '../components/StudentExamModal'
-import { ExternalLink, ArrowLeft, TrendingUp, Settings2 } from 'lucide-react'
+import { ExternalLink, ArrowLeft, TrendingUp, Settings2, FileDown } from 'lucide-react'
 import { format, parse } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -40,6 +40,85 @@ function getDow(d: string) {
   } catch {
     return null
   }
+}
+
+function parseExamDate(d: string) {
+  try {
+    return d.includes('-')
+      ? parse(d, 'yyyy-MM-dd', new Date())
+      : parse(d, 'dd.MM.yyyy', new Date())
+  } catch {
+    return null
+  }
+}
+
+function monthLabelFromDate(date: Date) {
+  const label = format(date, 'LLLL yyyy', { locale: ru })
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
+type TaskStat = {
+  task_number: number
+  attempts: number
+  correct: number
+  rate: number
+  problem_id: string
+  failed_problem_ids: string[]
+}
+
+function buildTaskStats(tasks: ExamTask[], answers: StudentAnswer[]): TaskStat[] {
+  const taskProblemByKey = new Map<string, string>()
+  for (const t of tasks) {
+    taskProblemByKey.set(`${t.exam}|${t.task_number}`, t.problem_id)
+  }
+
+  const failedByTask = new Map<number, Set<string>>()
+  for (const a of answers) {
+    if (a.is_correct) continue
+    const problemId = taskProblemByKey.get(`${a.exam}|${a.task_number}`)
+    if (!problemId) continue
+    const cur = failedByTask.get(a.task_number) ?? new Set<string>()
+    cur.add(problemId)
+    failedByTask.set(a.task_number, cur)
+  }
+
+  const answerMap = new Map<string, { attempts: number; correct: number }>()
+  for (const a of answers) {
+    const key = `${a.exam}|${a.task_number}`
+    const cur = answerMap.get(key) ?? { attempts: 0, correct: 0 }
+    answerMap.set(key, {
+      attempts: cur.attempts + 1,
+      correct: cur.correct + (a.is_correct ? 1 : 0),
+    })
+  }
+
+  const taskAgg = new Map<number, { attempts: number; correct: number; problem_id: string }>()
+  for (const t of tasks) {
+    const key = `${t.exam}|${t.task_number}`
+    const stats = answerMap.get(key)
+    if (!stats) continue
+    const cur = taskAgg.get(t.task_number) ?? {
+      attempts: 0,
+      correct: 0,
+      problem_id: t.problem_id,
+    }
+    taskAgg.set(t.task_number, {
+      attempts: cur.attempts + stats.attempts,
+      correct: cur.correct + stats.correct,
+      problem_id: t.problem_id,
+    })
+  }
+
+  return [...taskAgg.entries()]
+    .map(([task_number, s]) => ({
+      task_number,
+      attempts: s.attempts,
+      correct: s.correct,
+      rate: s.correct / s.attempts,
+      problem_id: s.problem_id,
+      failed_problem_ids: [...(failedByTask.get(task_number) ?? new Set<string>())],
+    }))
+    .sort((a, b) => a.task_number - b.task_number)
 }
 
 export default function StudentPage() {
@@ -157,29 +236,42 @@ export default function StudentPage() {
       return monthYear === selectedMonth
     })
 
-    const taskMap = new Map<number, { attempts: number; correct: number; problem_id: string }>()
-    for (const t of tasks) {
-      // Find if this specific task + exam combo was answered
-      // Wait, a student could answer task_number=1 in multiple exams.
-      // We need all answers matching task_number
-      const taskMatches = filteredAnswers.filter(
-        (a) => a.exam === t.exam && a.task_number === t.task_number,
-      )
-      if (taskMatches.length === 0) continue
-
-      const cur = taskMap.get(t.task_number) ?? { attempts: 0, correct: 0, problem_id: t.problem_id }
-
-      taskMap.set(t.task_number, {
-        attempts: cur.attempts + taskMatches.length,
-        correct: cur.correct + taskMatches.filter(a => a.is_correct).length,
-        problem_id: t.problem_id,
-      })
-    }
-
-    return [...taskMap.entries()]
-      .map(([n, s]) => ({ task_number: n, ...s, rate: s.correct / s.attempts }))
-      .sort((a, b) => a.task_number - b.task_number)
+    return buildTaskStats(tasks, filteredAnswers)
   }, [tasks, answers, selectedMonth, exams])
+
+  const taskStatsAll = useMemo(() => buildTaskStats(tasks, answers), [tasks, answers])
+
+  const { monthMeta, examMonthKey } = useMemo(() => {
+    const meta: { key: string; label: string }[] = []
+    const seen = new Set<string>()
+    const keyByExam = new Map<string, string>()
+
+    for (const exam of exams.values()) {
+      const parsed = parseExamDate(exam.date)
+      if (!parsed) continue
+      const key = format(parsed, 'yyyy-MM')
+      const label = monthLabelFromDate(parsed)
+      keyByExam.set(exam.id, key)
+      if (!seen.has(key)) {
+        seen.add(key)
+        meta.push({ key, label })
+      }
+    }
+    return { monthMeta: meta, examMonthKey: keyByExam }
+  }, [exams])
+
+  const monthlyStats = useMemo(() => {
+    return monthMeta.map(m => {
+      const filteredAnswers = answers.filter(a => examMonthKey.get(a.exam) === m.key)
+      const stats = buildTaskStats(tasks, filteredAnswers)
+      return {
+        key: m.key,
+        label: m.label,
+        stats,
+        weak: stats.filter(t => t.rate < 0.6),
+      }
+    })
+  }, [answers, examMonthKey, monthMeta, tasks])
 
   if (loading) {
     return <div className="card p-8 text-center text-gray-400 animate-pulse">Загрузка…</div>
@@ -242,7 +334,7 @@ export default function StudentPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl print-page">
       {/* Header */}
       <div className="flex items-center gap-4">
         <Link to="/journal" className="btn-ghost p-2">
@@ -255,6 +347,29 @@ export default function StudentPage() {
             {exemptCount > 0 && <span className="ml-1">· Зачтено: <strong className="text-blue-600">{exemptCount}</strong></span>}
             {' '}· Не сдано: <strong className={debtCount > 0 ? 'text-red-600' : ''}>{debtCount}</strong>
           </p>
+        </div>
+        <div className="ml-auto flex items-center gap-2 print-hidden">
+          <button
+            className="btn-ghost"
+            onClick={() => {
+              const prev = document.title
+              const stamp = format(new Date(), 'dd.MM.yyyy')
+              document.title = `${student.name} ${stamp}`
+              window.print()
+              window.setTimeout(() => { document.title = prev }, 1000)
+            }}
+            title="Экспорт этой страницы в PDF"
+          >
+            <FileDown size={16} />
+            Экспорт PDF
+          </button>
+          <Link
+            to={`/student/${student.id}/print`}
+            className="btn-ghost"
+            title="Открыть детальный отчет"
+          >
+            Отчет (детальный)
+          </Link>
         </div>
       </div>
 
@@ -307,8 +422,12 @@ export default function StudentPage() {
             <tbody>
               {results.map((r) => {
                 const exam = exams.get(r.exam)
+                const isExempt = r.did_not_take && r.is_exempt
                 return (
-                  <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50">
+                  <tr
+                    key={r.id}
+                    className={`border-b border-gray-50 hover:bg-gray-50 ${isExempt ? 'print-hidden-row' : ''}`}
+                  >
                     <td className="px-4 py-3">
                       <Link
                         to={`/exam/${r.exam}`}
@@ -367,7 +486,7 @@ export default function StudentPage() {
 
       {/* Month Filter for Stats */}
       {availableMonths.length > 0 && (
-        <div className="flex gap-2 flex-wrap items-center mt-8 mb-[-8px]">
+        <div className="flex gap-2 flex-wrap items-center mt-8 mb-[-8px] print-hidden">
           <span className="text-sm font-medium text-gray-500 mr-2">Период:</span>
           <button
             onClick={() => setSelectedMonth('all')}
@@ -397,7 +516,7 @@ export default function StudentPage() {
 
       {/* Task heatmap */}
       {taskStats.length > 0 && (
-        <div className="card p-5">
+        <div className="card p-5 task-all-card print-hidden">
           <h3 className="font-semibold text-gray-800 mb-4">Все задания</h3>
           <div className="flex flex-wrap gap-1.5">
             {taskStats.map((t) => {
@@ -427,19 +546,19 @@ export default function StudentPage() {
 
             {/* Weak tasks */}
       {weakTasks.length > 0 && (
-        <div className="card p-5">
+        <div className="card p-5 task-weak-card print-hidden">
           <h3 className="font-semibold text-gray-800 mb-4">
             Проблемные задания
             <span className="ml-2 text-xs font-normal text-gray-400">(&lt;60% правильных)</span>
           </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
             {weakTasks.map((t) => (
               <a
                 key={t.task_number}
                 href={problemUrl(t.problem_id)}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between gap-2 px-3 py-2.5 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all group"
+                className="weak-item flex flex-col items-start gap-1 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all group"
               >
                 <div>
                   <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-700">
@@ -449,12 +568,186 @@ export default function StudentPage() {
                     {t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)
                   </p>
                 </div>
-                <ExternalLink size={12} className="text-gray-300 group-hover:text-brand-400" />
+                {t.failed_problem_ids.length > 0 && (
+                  <div className="flex flex-wrap gap-1 text-[10px] text-gray-500">
+                    {t.failed_problem_ids.map((pid) => (
+                      <a
+                        key={pid}
+                        href={problemUrl(pid)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline underline-offset-2"
+                      >
+                        {pid}
+                      </a>
+                    ))}
+                  </div>
+                )}
               </a>
             ))}
           </div>
         </div>
       )}
+
+      {/* Print-only: monthly blocks, then all-time */}
+      <div className="print-only space-y-6">
+        {monthlyStats.map((m, idx) => (
+          <div key={m.key} className={`space-y-4 ${idx === 0 ? 'print-break-before' : ''}`}>
+            <h3 className="text-lg font-semibold text-gray-800">Период: {m.label}</h3>
+
+            <div className="card p-5 task-all-card">
+              <h4 className="font-semibold text-gray-800 mb-3">Все задания</h4>
+              {m.stats.length === 0 ? (
+                <p className="text-sm text-gray-400">Нет данных.</p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {m.stats.map((t) => {
+                    const pct = t.rate
+                    const bg =
+                      pct >= 0.8 ? 'bg-emerald-200 text-emerald-900'
+                        : pct >= 0.6 ? 'bg-lime-200 text-lime-900'
+                          : pct >= 0.4 ? 'bg-amber-200 text-amber-900'
+                            : 'bg-red-200 text-red-900'
+                    return (
+                      <a
+                        key={t.task_number}
+                        href={problemUrl(t.problem_id)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={`Задание ${t.task_number}: ${t.correct}/${t.attempts} (${Math.round(pct * 100)}%)`}
+                        className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg text-xs font-bold ${bg}`}
+                      >
+                        <span className="text-base leading-tight">{t.task_number}</span>
+                        <span className="opacity-70">{Math.round(pct * 100)}%</span>
+                      </a>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="card p-5 task-weak-card">
+              <h4 className="font-semibold text-gray-800 mb-3">Проблемные задания</h4>
+              {m.weak.length === 0 ? (
+                <p className="text-sm text-gray-400">Нет проблемных заданий.</p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {m.weak.map((t) => (
+                    <a
+                      key={t.task_number}
+                      href={problemUrl(t.problem_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="weak-item flex flex-col items-start gap-1 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all group"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-700">
+                          Задание {t.task_number}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)
+                        </p>
+                      </div>
+                      {t.failed_problem_ids.length > 0 && (
+                        <div className="flex flex-wrap gap-1 text-[10px] text-gray-500">
+                          {t.failed_problem_ids.map((pid) => (
+                            <a
+                              key={pid}
+                              href={problemUrl(pid)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline underline-offset-2"
+                            >
+                              {pid}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-800">Период: Всё время</h3>
+          {taskStatsAll.length > 0 && (
+            <div className="card p-5 task-all-card">
+              <h4 className="font-semibold text-gray-800 mb-3">Все задания</h4>
+              <div className="flex flex-wrap gap-1.5">
+                {taskStatsAll.map((t) => {
+                  const pct = t.rate
+                  const bg =
+                    pct >= 0.8 ? 'bg-emerald-200 text-emerald-900'
+                      : pct >= 0.6 ? 'bg-lime-200 text-lime-900'
+                        : pct >= 0.4 ? 'bg-amber-200 text-amber-900'
+                          : 'bg-red-200 text-red-900'
+                  return (
+                    <a
+                      key={t.task_number}
+                      href={problemUrl(t.problem_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Задание ${t.task_number}: ${t.correct}/${t.attempts} (${Math.round(pct * 100)}%)`}
+                      className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg text-xs font-bold ${bg}`}
+                    >
+                      <span className="text-base leading-tight">{t.task_number}</span>
+                      <span className="opacity-70">{Math.round(pct * 100)}%</span>
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {taskStatsAll.length > 0 && (
+            <div className="card p-5 task-weak-card">
+              <h4 className="font-semibold text-gray-800 mb-3">Проблемные задания</h4>
+              {taskStatsAll.filter(t => t.rate < 0.6).length === 0 ? (
+                <p className="text-sm text-gray-400">Нет проблемных заданий.</p>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                  {taskStatsAll.filter(t => t.rate < 0.6).map((t) => (
+                    <a
+                      key={t.task_number}
+                      href={problemUrl(t.problem_id)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="weak-item flex flex-col items-start gap-1 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all group"
+                    >
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-700">
+                          Задание {t.task_number}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)
+                        </p>
+                      </div>
+                      {t.failed_problem_ids.length > 0 && (
+                        <div className="flex flex-wrap gap-1 text-[10px] text-gray-500">
+                          {t.failed_problem_ids.map((pid) => (
+                            <a
+                              key={pid}
+                              href={problemUrl(pid)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="underline underline-offset-2"
+                            >
+                              {pid}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
 
       {selectedExamId && (
         <StudentExamModal

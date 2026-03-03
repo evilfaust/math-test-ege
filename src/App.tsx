@@ -9,6 +9,7 @@ import {
 import Dashboard from './pages/Dashboard'
 import Journal from './pages/Journal'
 import StudentPage from './pages/StudentPage'
+import StudentReportPage from './pages/StudentReportPage'
 import ExamPage from './pages/ExamPage'
 import StatsPage from './pages/StatsPage'
 import UploadPage from './pages/UploadPage'
@@ -92,6 +93,7 @@ export default function App() {
                 <Route path="/journal" element={<Journal />} />
                 <Route path="/journal/:groupId" element={<Journal />} />
                 <Route path="/student/:studentId" element={<StudentPage />} />
+                <Route path="/student/:studentId/print" element={<StudentReportPage />} />
                 <Route path="/exam/:examId" element={<ExamPage />} />
                 <Route path="/stats" element={<StatsPage />} />
                 <Route path="/upload" element={<UploadPage />} />

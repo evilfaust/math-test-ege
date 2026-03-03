@@ -45,3 +45,128 @@
     @apply bg-white rounded-xl border border-gray-200 shadow-sm;
   }
 }
+
+.print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 5mm;
+  }
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  body {
+    background: #fff !important;
+  }
+  aside,
+  header {
+    display: none !important;
+  }
+  main {
+    padding: 0 !important;
+  }
+  .ml-56 {
+    margin-left: 0 !important;
+  }
+  .flex-1 {
+    width: 100% !important;
+  }
+  .card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+  .print-hidden {
+    display: none !important;
+  }
+  .print-hidden-row {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+  .print-report {
+    max-width: none !important;
+  }
+  .print-page {
+    max-width: none !important;
+    margin: 0 !important;
+  }
+  .print-page .card {
+    padding: 10px 12px !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 12px !important;
+  }
+  .print-page h2 {
+    font-size: 18px !important;
+  }
+  .print-page h3 {
+    font-size: 14px !important;
+    margin-bottom: 6px !important;
+  }
+  .print-page h4 {
+    font-size: 12px !important;
+    margin-bottom: 4px !important;
+  }
+  .print-page p,
+  .print-page span,
+  .print-page td,
+  .print-page th,
+  .print-page button,
+  .print-page a {
+    font-size: 10px !important;
+  }
+  .print-page td,
+  .print-page th {
+    padding: 6px 8px !important;
+  }
+  .print-page .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    margin-top: 12px !important;
+  }
+  .print-page table {
+    page-break-inside: avoid;
+  }
+  .print-page tr {
+    page-break-inside: avoid;
+  }
+  .print-page .recharts-wrapper,
+  .print-page .recharts-responsive-container {
+    max-height: 180px !important;
+  }
+  .print-page .card {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .print-page .task-all-card,
+  .print-page .task-weak-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-break-before {
+    break-before: page;
+    page-break-before: always;
+  }
+  .print-page table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+  .print-page thead {
+    display: table-header-group;
+  }
+  .print-page .task-all-card {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+  }
+  .print-page .task-weak-card {
+    background: #ffffff !important;
+    border-color: #e5e7eb !important;
+  }
+
+  .print-page .weak-item {
+    border-color: #fca5a5 !important;
+    background: #fff0f0 !important;
+  }
+}
