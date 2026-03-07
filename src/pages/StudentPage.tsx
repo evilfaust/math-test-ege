@@ -591,6 +591,7 @@ export default function StudentPage() {
 
       {/* Print-only: monthly blocks, then all-time */}
       <div className="print-only space-y-6">
+
         {monthlyStats.map((m, idx) => (
           <div key={m.key} className={`space-y-4 ${idx === 0 ? 'print-break-before' : ''}`}>
             <h3 className="text-lg font-semibold text-gray-800">Период: {m.label}</h3>
@@ -603,23 +604,12 @@ export default function StudentPage() {
                 <div className="flex flex-wrap gap-1.5">
                   {m.stats.map((t) => {
                     const pct = t.rate
-                    const bg =
-                      pct >= 0.8 ? 'bg-emerald-200 text-emerald-900'
-                        : pct >= 0.6 ? 'bg-lime-200 text-lime-900'
-                          : pct >= 0.4 ? 'bg-amber-200 text-amber-900'
-                            : 'bg-red-200 text-red-900'
+                    const bg = pct >= 0.8 ? 'print-tile-green' : pct >= 0.6 ? 'print-tile-lime' : pct >= 0.4 ? 'print-tile-amber' : 'print-tile-red'
                     return (
-                      <a
-                        key={t.task_number}
-                        href={problemUrl(t.problem_id)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Задание ${t.task_number}: ${t.correct}/${t.attempts} (${Math.round(pct * 100)}%)`}
-                        className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg text-xs font-bold ${bg}`}
-                      >
-                        <span className="text-base leading-tight">{t.task_number}</span>
-                        <span className="opacity-70">{Math.round(pct * 100)}%</span>
-                      </a>
+                      <div key={t.task_number} className={`print-tile ${bg}`}>
+                        <span className="print-tile-num">{t.task_number}</span>
+                        <span className="print-tile-pct">{Math.round(pct * 100)}%</span>
+                      </div>
                     )
                   })}
                 </div>
@@ -631,39 +621,19 @@ export default function StudentPage() {
               {m.weak.length === 0 ? (
                 <p className="text-sm text-gray-400">Нет проблемных заданий.</p>
               ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+                <div className="print-weak-grid">
                   {m.weak.map((t) => (
-                    <a
-                      key={t.task_number}
-                      href={problemUrl(t.problem_id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="weak-item flex flex-col items-start gap-1 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all group"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-700">
-                          Задание {t.task_number}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)
-                        </p>
-                      </div>
+                    <div key={t.task_number} className="print-weak-item">
+                      <p className="print-weak-title">Задание {t.task_number}</p>
+                      <p className="print-weak-score">{t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)</p>
                       {t.failed_problem_ids.length > 0 && (
-                        <div className="flex flex-wrap gap-1 text-[10px] text-gray-500">
+                        <div className="print-weak-ids">
                           {t.failed_problem_ids.map((pid) => (
-                            <a
-                              key={pid}
-                              href={problemUrl(pid)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline underline-offset-2"
-                            >
-                              {pid}
-                            </a>
+                            <a key={pid} href={problemUrl(pid)} target="_blank" rel="noopener noreferrer" className="print-weak-id">{pid}</a>
                           ))}
                         </div>
                       )}
-                    </a>
+                    </div>
                   ))}
                 </div>
               )}
@@ -679,71 +649,36 @@ export default function StudentPage() {
               <div className="flex flex-wrap gap-1.5">
                 {taskStatsAll.map((t) => {
                   const pct = t.rate
-                  const bg =
-                    pct >= 0.8 ? 'bg-emerald-200 text-emerald-900'
-                      : pct >= 0.6 ? 'bg-lime-200 text-lime-900'
-                        : pct >= 0.4 ? 'bg-amber-200 text-amber-900'
-                          : 'bg-red-200 text-red-900'
+                  const bg = pct >= 0.8 ? 'print-tile-green' : pct >= 0.6 ? 'print-tile-lime' : pct >= 0.4 ? 'print-tile-amber' : 'print-tile-red'
                   return (
-                    <a
-                      key={t.task_number}
-                      href={problemUrl(t.problem_id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Задание ${t.task_number}: ${t.correct}/${t.attempts} (${Math.round(pct * 100)}%)`}
-                      className={`flex flex-col items-center justify-center w-14 h-14 rounded-lg text-xs font-bold ${bg}`}
-                    >
-                      <span className="text-base leading-tight">{t.task_number}</span>
-                      <span className="opacity-70">{Math.round(pct * 100)}%</span>
-                    </a>
+                    <div key={t.task_number} className={`print-tile ${bg}`}>
+                      <span className="print-tile-num">{t.task_number}</span>
+                      <span className="print-tile-pct">{Math.round(pct * 100)}%</span>
+                    </div>
                   )
                 })}
               </div>
             </div>
           )}
 
-          {taskStatsAll.length > 0 && (
+          {taskStatsAll.filter(t => t.rate < 0.6).length > 0 && (
             <div className="card p-5 task-weak-card">
               <h4 className="font-semibold text-gray-800 mb-3">Проблемные задания</h4>
-              {taskStatsAll.filter(t => t.rate < 0.6).length === 0 ? (
-                <p className="text-sm text-gray-400">Нет проблемных заданий.</p>
-              ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
-                  {taskStatsAll.filter(t => t.rate < 0.6).map((t) => (
-                    <a
-                      key={t.task_number}
-                      href={problemUrl(t.problem_id)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="weak-item flex flex-col items-start gap-1 px-2.5 py-2 rounded-lg border border-gray-200 hover:border-brand-300 hover:bg-brand-50 transition-all group"
-                    >
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800 group-hover:text-brand-700">
-                          Задание {t.task_number}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)
-                        </p>
+              <div className="print-weak-grid">
+                {taskStatsAll.filter(t => t.rate < 0.6).map((t) => (
+                  <div key={t.task_number} className="print-weak-item">
+                    <p className="print-weak-title">Задание {t.task_number}</p>
+                    <p className="print-weak-score">{t.correct}/{t.attempts} ({Math.round(t.rate * 100)}%)</p>
+                    {t.failed_problem_ids.length > 0 && (
+                      <div className="print-weak-ids">
+                        {t.failed_problem_ids.map((pid) => (
+                          <a key={pid} href={problemUrl(pid)} target="_blank" rel="noopener noreferrer" className="print-weak-id">{pid}</a>
+                        ))}
                       </div>
-                      {t.failed_problem_ids.length > 0 && (
-                        <div className="flex flex-wrap gap-1 text-[10px] text-gray-500">
-                          {t.failed_problem_ids.map((pid) => (
-                            <a
-                              key={pid}
-                              href={problemUrl(pid)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="underline underline-offset-2"
-                            >
-                              {pid}
-                            </a>
-                          ))}
-                        </div>
-                      )}
-                    </a>
-                  ))}
-                </div>
-              )}
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

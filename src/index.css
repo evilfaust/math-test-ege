@@ -107,14 +107,30 @@
     background: #fff !important;
   }
   aside,
-  header {
+  header,
+  .app-sidebar,
+  .app-header {
     display: none !important;
+  }
+  html,
+  body,
+  #root,
+  .app-shell {
+    width: 100% !important;
+    min-height: auto !important;
+    background: #fff !important;
+  }
+  .lg\:ml-64,
+  .ml-56 {
+    margin-left: 0 !important;
+  }
+  .max-w-4xl,
+  .max-w-5xl {
+    max-width: none !important;
   }
   main {
     padding: 0 !important;
-  }
-  .ml-56 {
-    margin-left: 0 !important;
+    width: 100% !important;
   }
   .flex-1 {
     width: 100% !important;
@@ -122,6 +138,9 @@
   .card {
     border: none !important;
     box-shadow: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: #ffffff !important;
   }
   .print-hidden {
     display: none !important;
@@ -176,9 +195,17 @@
   .print-page tr {
     page-break-inside: avoid;
   }
-  .print-page .recharts-wrapper,
   .print-page .recharts-responsive-container {
-    max-height: 180px !important;
+    width: 100% !important;
+    height: 180px !important;
+    min-height: 180px !important;
+  }
+  .print-page .recharts-wrapper {
+    width: 100% !important;
+    height: 180px !important;
+  }
+  .print-page .recharts-surface {
+    width: 100% !important;
   }
   .print-page .card {
     break-inside: auto;
@@ -212,5 +239,65 @@
   .print-page .weak-item {
     border-color: #fca5a5 !important;
     background: #fff0f0 !important;
+  }
+
+  /* Print tile grid */
+  .print-tile {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    font-weight: 700;
+  }
+  .print-tile-num {
+    font-size: 13px;
+    line-height: 1.2;
+  }
+  .print-tile-pct {
+    font-size: 9px;
+    opacity: 0.75;
+  }
+  .print-tile-green { background: #a7f3d0 !important; color: #065f46 !important; }
+  .print-tile-lime  { background: #d9f99d !important; color: #3f6212 !important; }
+  .print-tile-amber { background: #fde68a !important; color: #92400e !important; }
+  .print-tile-red   { background: #fecaca !important; color: #991b1b !important; }
+
+  /* Print weak tasks grid */
+  .print-weak-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+  .print-weak-item {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid #fca5a5 !important;
+    background: #fff5f5 !important;
+  }
+  .print-weak-title {
+    font-size: 10px;
+    font-weight: 700;
+    color: #1f2937;
+  }
+  .print-weak-score {
+    font-size: 9px;
+    color: #6b7280;
+  }
+  .print-weak-ids {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px;
+    margin-top: 2px;
+  }
+  .print-weak-id {
+    font-size: 8px;
+    color: #4f6ef7;
+    text-decoration: underline;
   }
 }

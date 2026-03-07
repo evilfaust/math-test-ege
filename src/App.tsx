@@ -66,7 +66,7 @@ function Sidebar() {
 
 function MobileNav() {
   return (
-    <nav className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+    <nav className="print-hidden mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden">
       {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
         <NavLink
           key={to}

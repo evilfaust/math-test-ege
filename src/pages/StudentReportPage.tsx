@@ -133,13 +133,25 @@ export default function StudentReportPage() {
   }, [studentId])
 
   useEffect(() => {
+    if (!student) return
+
+    const previousTitle = document.title
+    const stamp = format(new Date(), 'dd.MM.yyyy')
+    document.title = `${student.name} ${stamp}`
+
+    return () => {
+      document.title = previousTitle
+    }
+  }, [student])
+
+  useEffect(() => {
     const params = new URLSearchParams(location.search)
-    if (params.get('auto') === '1') {
+    if (params.get('auto') === '1' && student) {
       const id = window.setTimeout(() => window.print(), 300)
       return () => window.clearTimeout(id)
     }
     return undefined
-  }, [location.search])
+  }, [location.search, student])
 
   const { monthMeta, examMonthKey } = useMemo(() => {
     const meta: { key: string; label: string }[] = []
