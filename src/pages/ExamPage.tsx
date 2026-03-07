@@ -19,6 +19,8 @@ export default function ExamPage() {
   const [students, setStudents] = useState<Student[]>([])
   const [results, setResults] = useState<Map<string, StudentResult>>(new Map())
   const [taskAccuracy, setTaskAccuracy] = useState<TaskAccuracy[]>([])
+  const [examAnswers, setExamAnswers] = useState<StudentAnswer[]>([])
+  const [examTasks, setExamTasks] = useState<ExamTask[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -37,6 +39,8 @@ export default function ExamPage() {
         ])
 
         setStudents(stds)
+        setExamAnswers(answers)
+        setExamTasks(tasks)
 
         const resMap = new Map<string, StudentResult>()
         for (const r of res) resMap.set(r.student, r)
@@ -67,6 +71,21 @@ export default function ExamPage() {
 
   if (loading) return <div className="card p-8 text-center text-gray-400 animate-pulse">Загрузка…</div>
   if (!exam) return <div className="card p-8 text-center text-gray-500">Тест не найден</div>
+
+  // task_number → problem_id lookup
+  const taskProblemMap = new Map<number, string>()
+  for (const t of examTasks) taskProblemMap.set(t.task_number, t.problem_id)
+
+  // studentId → failed tasks sorted by number
+  const studentFailedTasks = new Map<string, { task_number: number; problem_id: string }[]>()
+  for (const s of students) {
+    const failed = examAnswers
+      .filter((a) => a.student === s.id && !a.is_correct)
+      .map((a) => ({ task_number: a.task_number, problem_id: taskProblemMap.get(a.task_number) ?? '' }))
+      .filter((f) => f.problem_id)
+      .sort((a, b) => a.task_number - b.task_number)
+    studentFailedTasks.set(s.id, failed)
+  }
 
   const taken = students.filter((s) => {
     const r = results.get(s.id)
@@ -193,11 +212,14 @@ export default function ExamPage() {
               <th className="text-left px-4 py-3 font-medium text-gray-600">Студент</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Оценка</th>
               <th className="text-center px-4 py-3 font-medium text-gray-600">Правильных</th>
+              <th className="text-left px-4 py-3 font-medium text-gray-600">Ошибки</th>
             </tr>
           </thead>
           <tbody>
             {students.map((s) => {
               const r = results.get(s.id)
+              const failed = studentFailedTasks.get(s.id) ?? []
+              const didNotTake = !r || r.did_not_take
               return (
                 <tr key={s.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -214,6 +236,28 @@ export default function ExamPage() {
                   </td>
                   <td className="px-4 py-3 text-center text-gray-600">
                     {r && !r.did_not_take ? `${r.correct_count} / ${exam.task_count}` : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {didNotTake ? (
+                      <span className="text-gray-300 text-xs">—</span>
+                    ) : failed.length === 0 ? (
+                      <span className="text-emerald-500 text-xs font-medium">Все верно</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {failed.map((f) => (
+                          <a
+                            key={f.task_number}
+                            href={problemUrl(f.problem_id)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={`Задание ${f.task_number} (задача ${f.problem_id})`}
+                            className="inline-flex items-center justify-center w-6 h-6 rounded text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-800 transition-colors"
+                          >
+                            {f.task_number}
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </td>
                 </tr>
               )

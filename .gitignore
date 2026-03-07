@@ -1,6 +1,7 @@
 # IDE
 .idea/
 .vscode/
+.gigaidea/
 *.swp
 *.swo
 
@@ -148,6 +149,7 @@ vite.config.ts.timestamp-*
 pb
 pb.zip
 pb_data/
+backups/
 pb_public/assets/*.js
 pb_public/assets/*.css
 pb_public/index.html
