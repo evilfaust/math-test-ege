@@ -24,14 +24,6 @@ function monthLabelFromDate(date: Date) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-type TaskStat = {
-  task_number: number
-  attempts: number
-  correct: number
-  rate: number
-  problem_id: string
-}
-
 function buildTaskStats(tasks: ExamTask[], answers: StudentAnswer[]) {
   const answerMap = new Map<string, { attempts: number; correct: number }>()
   for (const a of answers) {
@@ -86,7 +78,7 @@ export default function StudentReportPage() {
 
     async function load() {
       try {
-        const std = await pb.collection('students').getOne<Student>(studentId)
+        const std = await pb.collection('students').getOne<Student>(studentId!)
         setStudent(std)
 
         const allGroupExams = await pb.collection('exams').getFullList<Exam>({

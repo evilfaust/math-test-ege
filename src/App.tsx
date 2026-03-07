@@ -14,34 +14,40 @@ import ExamPage from './pages/ExamPage'
 import StatsPage from './pages/StatsPage'
 import UploadPage from './pages/UploadPage'
 import SetupGuard from './components/SetupGuard'
+import GlobalSearch from './components/GlobalSearch'
+
+const NAV_ITEMS = [
+  { to: '/', icon: LayoutDashboard, label: 'Обзор', end: true },
+  { to: '/journal', icon: BookOpen, label: 'Журнал' },
+  { to: '/stats', icon: BarChart2, label: 'Статистика' },
+  { to: '/upload', icon: Upload, label: 'Загрузить' },
+]
 
 function Sidebar() {
-  const nav = [
-    { to: '/', icon: LayoutDashboard, label: 'Обзор', end: true },
-    { to: '/journal', icon: BookOpen, label: 'Журнал' },
-    { to: '/stats', icon: BarChart2, label: 'Статистика' },
-    { to: '/upload', icon: Upload, label: 'Загрузить' },
-  ]
-
   return (
-    <aside className="fixed inset-y-0 left-0 w-56 bg-white border-r border-gray-200 flex flex-col z-10">
-      <div className="flex items-center gap-2 px-5 py-5 border-b border-gray-100">
-        <GraduationCap className="text-brand-600" size={22} />
-        <span className="font-bold text-gray-800 text-lg leading-tight">
+    <aside className="app-sidebar fixed inset-y-0 left-0 z-20 hidden w-64 flex-col border-r border-white/60 lg:flex">
+      <div className="border-b border-white/60 px-6 py-6">
+        <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-600/10 text-brand-700 shadow-[inset_0_0_0_1px_rgba(79,110,247,0.12)]">
+          <GraduationCap size={22} />
+        </div>
+        <span className="block font-bold text-slate-800 text-lg leading-tight">
           Журнал ЕГЭ
         </span>
+        <p className="mt-1 text-sm text-slate-500">
+          Аналитика по группам, тестам и прогрессу
+        </p>
       </div>
-      <nav className="flex-1 p-3 space-y-0.5">
-        {nav.map(({ to, icon: Icon, label, end }) => (
+      <nav className="flex-1 p-4 space-y-1">
+        {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
           <NavLink
             key={to}
             to={to}
             end={end}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              `flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium transition-all ${
                 isActive
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  ? 'bg-slate-900 text-white shadow-[0_14px_30px_rgba(15,23,42,0.16)]'
+                  : 'text-slate-600 hover:bg-white/80 hover:text-slate-900'
               }`
             }
           >
@@ -50,10 +56,35 @@ function Sidebar() {
           </NavLink>
         ))}
       </nav>
-      <div className="p-4 border-t border-gray-100">
-        <p className="text-xs text-gray-400">Решу ЕГЭ · Журнал</p>
+      <div className="border-t border-white/60 p-4">
+        <p className="text-xs uppercase tracking-[0.2em] text-slate-400">Решу ЕГЭ</p>
+        <p className="mt-1 text-sm text-slate-500">Локальный кабинет преподавателя</p>
       </div>
     </aside>
+  )
+}
+
+function MobileNav() {
+  return (
+    <nav className="mb-5 flex gap-2 overflow-x-auto pb-1 lg:hidden">
+      {NAV_ITEMS.map(({ to, icon: Icon, label, end }) => (
+        <NavLink
+          key={to}
+          to={to}
+          end={end}
+          className={({ isActive }) =>
+            `inline-flex shrink-0 items-center gap-2 rounded-2xl px-4 py-2.5 text-sm font-medium transition-all ${
+              isActive
+                ? 'bg-slate-900 text-white shadow-[0_14px_30px_rgba(15,23,42,0.16)]'
+                : 'bg-white/80 text-slate-600 ring-1 ring-slate-200/80 hover:text-slate-900'
+            }`
+          }
+        >
+          <Icon size={16} />
+          {label}
+        </NavLink>
+      ))}
+    </nav>
   )
 }
 
@@ -79,15 +110,24 @@ export default function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <SetupGuard>
-        <div className="flex min-h-screen">
+        <div className="app-shell flex min-h-screen">
           <Sidebar />
-          <div className="flex-1 ml-56 flex flex-col min-h-screen">
-            <header className="sticky top-0 z-10 bg-white border-b border-gray-200 px-8 py-4">
-              <h1 className="text-xl font-semibold text-gray-800">
-                <PageTitle />
-              </h1>
+          <div className="flex min-h-screen flex-1 flex-col lg:ml-64">
+            <header className="app-header sticky top-0 z-10 border-b border-white/60 px-4 py-4 backdrop-blur sm:px-6 lg:px-8">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    Панель преподавателя
+                  </p>
+                  <h1 className="text-2xl font-semibold text-slate-900">
+                    <PageTitle />
+                  </h1>
+                </div>
+                <GlobalSearch />
+              </div>
             </header>
-            <main className="flex-1 p-8">
+            <main className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+              <MobileNav />
               <Routes>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/journal" element={<Journal />} />

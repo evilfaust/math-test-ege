@@ -9,14 +9,6 @@ interface DebtItem {
   exam: Exam
 }
 
-interface WeakTask {
-  task_number: number
-  problem_id: string
-  correct: number
-  total: number
-  rate: number
-}
-
 interface GroupStat {
   group: Group
   examCount: number
@@ -49,8 +41,7 @@ export default function StatsPage() {
   // Tasks/Answers state
   const [tasks, setTasks] = useState<{ id: string; exam: string; task_number: number; problem_id: string }[]>([])
   const [answers, setAnswers] = useState<StudentAnswer[]>([])
-  const [availableMonths, setAvailableMonths] = useState<string[]>([])
-  const [selectedMonth, setSelectedMonth] = useState<string>('all')
+  const selectedMonth = 'all'
   const [exams, setExams] = useState<Exam[]>([])
 
   const [groupStats, setGroupStats] = useState<GroupStat[]>([])
@@ -133,22 +124,6 @@ export default function StatsPage() {
       setTasks(tasks)
       setAnswers(answers)
       setExams(exams)
-
-      // Extract months correctly (Chronological from exams mapping)
-      const months = new Set<string>()
-      // We process exams in order to extract months chronologically backwards (because sort: '-date')
-      // Let's sort ascending for the UI
-      const sortedExams = [...exams].sort((a, b) => a.date.localeCompare(b.date))
-      sortedExams.forEach(e => {
-        const dateStr = fmtDate(e.date)
-        const parts = dateStr.split(' ')
-        if (parts.length >= 3) {
-          months.add(`${parts[1]} ${parts[2]}`)
-        } else if (parts.length === 2) {
-          months.add(`${parts[0]} ${parts[1]}`)
-        }
-      })
-      setAvailableMonths(Array.from(months))
 
       // ── Group stats ────────────────────────────────────────
       const gs: GroupStat[] = []

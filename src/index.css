@@ -3,11 +3,23 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    color-scheme: light;
+    --app-bg:
+      radial-gradient(circle at top left, rgba(79, 110, 247, 0.16), transparent 28%),
+      radial-gradient(circle at top right, rgba(16, 185, 129, 0.12), transparent 22%),
+      linear-gradient(180deg, #f8fbff 0%, #f3f6fb 40%, #eef2f7 100%);
+  }
+}
+
+@layer base {
   html {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-family: 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
   }
   body {
-    @apply bg-gray-50 text-gray-900;
+    @apply text-gray-900;
+    background: var(--app-bg);
+    min-height: 100vh;
   }
 }
 
@@ -29,20 +41,52 @@
   }
 
   .btn {
-    @apply inline-flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all duration-150 cursor-pointer select-none;
+    @apply inline-flex items-center gap-2 px-4 py-2 rounded-xl font-medium transition-all duration-150 cursor-pointer select-none;
   }
   .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:scale-95;
+    @apply btn bg-brand-600 text-white hover:bg-brand-700 active:scale-95 shadow-[0_14px_32px_rgba(79,110,247,0.28)];
   }
   .btn-ghost {
-    @apply btn text-gray-600 hover:bg-gray-100 active:scale-95;
+    @apply btn text-gray-600 hover:bg-white active:scale-95;
   }
   .btn-danger {
     @apply btn bg-red-50 text-red-600 hover:bg-red-100 active:scale-95;
   }
 
   .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm;
+    @apply rounded-[24px] border border-white/70 bg-white/90 shadow-[0_22px_60px_rgba(15,23,42,0.08)] backdrop-blur;
+  }
+
+  .app-shell {
+    @apply text-slate-900;
+  }
+
+  .app-sidebar {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.92) 0%, rgba(245,248,253,0.92) 100%);
+    box-shadow: 24px 0 70px rgba(15, 23, 42, 0.08);
+    backdrop-filter: blur(20px);
+  }
+
+  .app-header {
+    background:
+      linear-gradient(180deg, rgba(248,251,255,0.92) 0%, rgba(248,251,255,0.76) 100%);
+  }
+
+  .search-input {
+    @apply h-12 rounded-2xl border border-white/70 bg-white/90 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400;
+    box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  }
+
+  .search-input:focus {
+    @apply border-brand-200;
+    box-shadow:
+      0 18px 45px rgba(79, 110, 247, 0.14),
+      0 0 0 4px rgba(79, 110, 247, 0.08);
+  }
+
+  .search-panel {
+    backdrop-filter: blur(24px);
   }
 }
 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { pb, type Group, type Student, type Exam, type StudentResult, examUrl } from '../lib/pb'
-import { BookOpen, Users, FileText, AlertTriangle, Upload, ExternalLink, TrendingUp } from 'lucide-react'
+import { pb, type Group, type Student, type Exam, type StudentResult, type StudentAnswer, type ExamTask, examUrl, problemUrl } from '../lib/pb'
+import { BookOpen, Users, FileText, AlertTriangle, Upload, ExternalLink, TrendingUp, Target, Radar } from 'lucide-react'
 import { format, parse } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -41,9 +41,25 @@ interface GroupInfo {
   debtCount: number
 }
 
+interface DebtorInfo {
+  student: Student
+  groupName: string
+  debtCount: number
+}
+
+interface WeakTaskInfo {
+  taskNumber: number
+  problemId: string
+  correct: number
+  total: number
+  rate: number
+}
+
 export default function Dashboard() {
   const [groupInfos, setGroupInfos] = useState<GroupInfo[]>([])
   const [recentExams, setRecentExams] = useState<Exam[]>([])
+  const [topDebtors, setTopDebtors] = useState<DebtorInfo[]>([])
+  const [weakTasks, setWeakTasks] = useState<WeakTaskInfo[]>([])
   const [totalStudents, setTotalStudents] = useState(0)
   const [totalExams, setTotalExams] = useState(0)
   const [debtCount, setDebtCount] = useState(0)
@@ -53,11 +69,13 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [groups, exams, students, results] = await Promise.all([
+        const [groups, exams, students, results, answers, tasks] = await Promise.all([
           pb.collection('groups').getFullList<Group>({ sort: 'name' }),
           pb.collection('exams').getFullList<Exam>({ sort: '-date', expand: 'group' }),
           pb.collection('students').getFullList<Student>(),
           pb.collection('student_results').getFullList<StudentResult>(),
+          pb.collection('student_answers').getFullList<StudentAnswer>(),
+          pb.collection('exam_tasks').getFullList<ExamTask>(),
         ])
 
         if (groups.length === 0) {
@@ -106,6 +124,63 @@ export default function Dashboard() {
         setTotalStudents(students.length)
         setTotalExams(exams.length)
         setDebtCount(totalDebts)
+
+        const groupById = new Map(groups.map((group) => [group.id, group.name]))
+        const debtors: DebtorInfo[] = students
+          .map((student) => {
+            const studentExams = exams.filter((exam) => exam.group === student.group)
+            let studentDebtCount = 0
+
+            for (const exam of studentExams) {
+              const result = resultMap.get(`${student.id}__${exam.id}`)
+              if ((!result || result.did_not_take) && !result?.is_exempt) {
+                studentDebtCount++
+              }
+            }
+
+            return {
+              student,
+              groupName: groupById.get(student.group) ?? 'Без группы',
+              debtCount: studentDebtCount,
+            }
+          })
+          .filter((item) => item.debtCount > 0)
+          .sort((a, b) => b.debtCount - a.debtCount || a.student.name.localeCompare(b.student.name))
+          .slice(0, 5)
+
+        setTopDebtors(debtors)
+
+        const problemByExamTask = new Map<string, string>()
+        for (const task of tasks) {
+          problemByExamTask.set(`${task.exam}__${task.task_number}`, task.problem_id)
+        }
+
+        const weakTaskMap = new Map<number, WeakTaskInfo>()
+        for (const answer of answers) {
+          const key = `${answer.exam}__${answer.task_number}`
+          const problemId = problemByExamTask.get(key)
+          if (!problemId) continue
+
+          const current = weakTaskMap.get(answer.task_number) ?? {
+            taskNumber: answer.task_number,
+            problemId,
+            correct: 0,
+            total: 0,
+            rate: 0,
+          }
+
+          current.total += 1
+          current.correct += answer.is_correct ? 1 : 0
+          current.rate = current.total > 0 ? current.correct / current.total : 0
+          weakTaskMap.set(answer.task_number, current)
+        }
+
+        setWeakTasks(
+          [...weakTaskMap.values()]
+            .filter((task) => task.total >= 5)
+            .sort((a, b) => a.rate - b.rate || a.taskNumber - b.taskNumber)
+            .slice(0, 6),
+        )
       } catch (e) {
         console.error(e)
         setEmpty(true)
@@ -175,8 +250,14 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Groups with stats */}
         <div className="card overflow-hidden">
-          <div className="px-5 py-4 border-b border-gray-100">
-            <h3 className="font-semibold text-gray-800">Группы</h3>
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <h3 className="font-semibold text-gray-800">Группы</h3>
+              <p className="text-xs text-slate-400">Снимок по текущему журналу</p>
+            </div>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+              {groupInfos.length}
+            </span>
           </div>
           <div className="divide-y divide-gray-50">
             {groupInfos.map(({ group, studentCount, examCount, avgGrade, debtCount: gd }) => (
@@ -210,7 +291,10 @@ export default function Dashboard() {
         {/* Recent exams */}
         <div className="card overflow-hidden">
           <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h3 className="font-semibold text-gray-800">Последние тесты</h3>
+            <div>
+              <h3 className="font-semibold text-gray-800">Последние тесты</h3>
+              <p className="text-xs text-slate-400">Быстрый вход в свежие работы</p>
+            </div>
             <Link to="/journal" className="text-xs text-brand-600 hover:underline">Все →</Link>
           </div>
           <div className="divide-y divide-gray-50">
@@ -247,8 +331,91 @@ export default function Dashboard() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 xl:grid-cols-[1.2fr_0.8fr] gap-6">
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div className="flex items-center gap-2">
+              <Target size={16} className="text-red-500" />
+              <div>
+                <h3 className="font-semibold text-slate-800">Требует внимания</h3>
+                <p className="text-xs text-slate-400">Студенты с наибольшим числом долгов</p>
+              </div>
+            </div>
+            <Link to="/stats" className="text-xs text-brand-600 hover:underline">
+              К статистике →
+            </Link>
+          </div>
+          {topDebtors.length === 0 ? (
+            <div className="px-5 py-8 text-sm text-slate-400">Сейчас нет студентов с долгами.</div>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {topDebtors.map(({ student, groupName, debtCount: count }, index) => (
+                <Link
+                  key={student.id}
+                  to={`/student/${student.id}`}
+                  className="flex items-center gap-4 px-5 py-4 transition-colors hover:bg-slate-50"
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-sm font-bold text-red-600">
+                    {index + 1}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-slate-800">{student.name}</p>
+                    <p className="text-xs text-slate-500">{groupName}</p>
+                  </div>
+                  <div className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-600">
+                    {count} долг{count === 1 ? '' : count < 5 ? 'а' : 'ов'}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="card overflow-hidden">
+          <div className="flex items-center gap-2 border-b border-slate-100 px-5 py-4">
+            <Radar size={16} className="text-amber-500" />
+            <div>
+              <h3 className="font-semibold text-slate-800">Слабые задания</h3>
+              <p className="text-xs text-slate-400">Что стоит разобрать на ближайшем занятии</p>
+            </div>
+          </div>
+          {weakTasks.length === 0 ? (
+            <div className="px-5 py-8 text-sm text-slate-400">Недостаточно данных по ответам.</div>
+          ) : (
+            <div className="grid gap-3 p-4">
+              {weakTasks.map((task) => (
+                <a
+                  key={task.taskNumber}
+                  href={problemUrl(task.problemId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-2xl border border-amber-100 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 transition-transform hover:-translate-y-0.5"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">Задание {task.taskNumber}</p>
+                      <p className="text-xs text-slate-500">
+                        {task.correct} из {task.total} верных попыток
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-amber-700">
+                        {Math.round(task.rate * 100)}%
+                      </p>
+                      <p className="text-[11px] uppercase tracking-[0.16em] text-amber-500">
+                        точность
+                      </p>
+                    </div>
+                  </div>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Quick actions */}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap gap-3">
         <Link to="/upload" className="btn-primary">
           <Upload size={16} />
           Загрузить новые результаты
