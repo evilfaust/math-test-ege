@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 
 const GITHUB_URL = 'https://github.com/evilfaust/ege-journal'
+const AUTHOR_URL = 'https://iopav.ru'
 
 export default function LandingPage() {
     const [dark, setDark] = useState(() => {
@@ -57,6 +58,14 @@ export default function LandingPage() {
                         >
                             {dark ? <Sun size={17} /> : <Moon size={17} />}
                         </button>
+                        <a
+                            href={AUTHOR_URL}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="hidden sm:inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                            Проекты автора
+                        </a>
                         <a
                             href={GITHUB_URL}
                             target="_blank"
@@ -336,6 +345,14 @@ export default function LandingPage() {
                             className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-sm cursor-pointer"
                         >
                             Возможности
+                        </a>
+                        <a
+                            href={AUTHOR_URL}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors text-sm cursor-pointer"
+                        >
+                            iopav.ru
                         </a>
                     </div>
                 </div>
