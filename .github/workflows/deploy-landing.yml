@@ -19,8 +19,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build with subpath base
-        run: npx vite build --base=/projects/ege-journal/
+      - name: Build
+        run: npm run build
 
       - name: Deploy via rsync
         uses: burnett01/rsync-deployments@7.0.1
