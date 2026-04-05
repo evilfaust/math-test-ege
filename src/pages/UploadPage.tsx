@@ -26,6 +26,20 @@ interface FileState {
   sheets?: ParsedSheet[]
   preview?: ImportPreview
   progress?: ImportProgress
+  excludedExamKeys?: Set<string>  // `${groupName}__${exam_id}`
+}
+
+/** Returns sheets with excluded exams (and their results) filtered out */
+function applyExclusions(sheets: ParsedSheet[], excluded: Set<string>): ParsedSheet[] {
+  if (excluded.size === 0) return sheets
+  return sheets.map((sheet) => ({
+    ...sheet,
+    exams: sheet.exams.filter((e) => !excluded.has(`${sheet.groupName}__${e.exam_id}`)),
+    students: sheet.students.map((s) => ({
+      ...s,
+      results: s.results.filter((r) => !excluded.has(`${sheet.groupName}__${r.exam_id}`)),
+    })),
+  }))
 }
 
 export default function UploadPage() {
@@ -65,6 +79,18 @@ export default function UploadPage() {
     }
   }, [updateFile])
 
+  const toggleExamKey = useCallback((file: File, key: string) => {
+    setFiles((prev) =>
+      prev.map((item) => {
+        if (item.file !== file) return item
+        const excluded = new Set(item.excludedExamKeys ?? [])
+        if (excluded.has(key)) excluded.delete(key)
+        else excluded.add(key)
+        return { ...item, excludedExamKeys: excluded }
+      }),
+    )
+  }, [])
+
   const startImport = useCallback(async (file: File) => {
     const current = files.find((item) => item.file === file)
     if (!current?.sheets) return
@@ -75,7 +101,8 @@ export default function UploadPage() {
         progress: { stage: 'Подготовка импорта…', current: 0, total: 1 },
       })
 
-      await importSheets(current.sheets, (progress) => updateFile(file, { progress }))
+      const sheets = applyExclusions(current.sheets, current.excludedExamKeys ?? new Set())
+      await importSheets(sheets, (progress) => updateFile(file, { progress }))
 
       updateFile(file, { status: 'done', error: undefined })
     } catch (e: unknown) {
@@ -195,22 +222,45 @@ export default function UploadPage() {
                         Предпросмотр по листам
                       </p>
                       <div className="mt-2 space-y-2">
-                        {fileState.preview.sheets.map((sheet) => (
+                        {fileState.sheets.map((sheet) => (
                           <div key={sheet.groupName} className="rounded-xl bg-white px-3 py-2.5">
                             <div className="flex items-center justify-between gap-3">
                               <p className="text-sm font-semibold text-slate-800">{sheet.groupName}</p>
                               <span className="text-xs text-slate-400">
-                                {sheet.exams.create + sheet.exams.update + sheet.exams.reuse} тестов
+                                {sheet.exams.length} тестов
                               </span>
                             </div>
-                            <p className="mt-1 text-xs leading-5 text-slate-500">
-                              Ученики: +{sheet.students.create}, повторно {sheet.students.reuse} ·
-                              Тесты: +{sheet.exams.create}, обновить {sheet.exams.update}, без изменений {sheet.exams.reuse} ·
-                              Результаты: +{sheet.results.create}, обновить {sheet.results.update}, пропустить {sheet.results.skip}
-                            </p>
+                            <div className="mt-2 space-y-1">
+                              {sheet.exams.map((exam) => {
+                                const key = `${sheet.groupName}__${exam.exam_id}`
+                                const excluded = fileState.excludedExamKeys?.has(key) ?? false
+                                return (
+                                  <label
+                                    key={exam.exam_id}
+                                    className="flex items-center gap-2 cursor-pointer group"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={!excluded}
+                                      onChange={() => toggleExamKey(fileState.file, key)}
+                                      className="rounded border-slate-300 text-brand-500 focus:ring-brand-400"
+                                    />
+                                    <span className={`text-xs ${excluded ? 'line-through text-slate-300' : 'text-slate-600'}`}>
+                                      {exam.label || exam.title}
+                                      <span className="ml-1.5 text-slate-400">{exam.date}</span>
+                                    </span>
+                                  </label>
+                                )
+                              })}
+                            </div>
                           </div>
                         ))}
                       </div>
+                      {(fileState.excludedExamKeys?.size ?? 0) > 0 && (
+                        <p className="mt-2 text-xs text-amber-600">
+                          {fileState.excludedExamKeys!.size} {fileState.excludedExamKeys!.size === 1 ? 'работа исключена' : 'работы исключены'} из импорта
+                        </p>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap gap-2">

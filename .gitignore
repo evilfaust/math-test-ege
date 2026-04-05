@@ -177,6 +177,10 @@ pb_migrations/
 
 # Temp files
 tmp/
+inspect_excel.mjs
+migrate-dates.mjs
+test_full_parser.mjs
+test_full_parser.ts
 
 # Bot secrets (use .env.example as reference)
 .env.bot

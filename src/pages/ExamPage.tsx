@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
 import { pb, type Exam, type Student, type StudentResult, type StudentAnswer, type ExamTask, examUrl, problemUrl } from '../lib/pb'
 import GradeCell from '../components/GradeCell'
-import { ExternalLink, ArrowLeft, AlertTriangle } from 'lucide-react'
+import { ExternalLink, ArrowLeft, AlertTriangle, Trash2, Loader2 } from 'lucide-react'
 
 interface TaskAccuracy {
   task_number: number
@@ -15,6 +15,7 @@ interface TaskAccuracy {
 
 export default function ExamPage() {
   const { examId } = useParams<{ examId: string }>()
+  const navigate = useNavigate()
   const [exam, setExam] = useState<Exam | null>(null)
   const [students, setStudents] = useState<Student[]>([])
   const [results, setResults] = useState<Map<string, StudentResult>>(new Map())
@@ -22,6 +23,21 @@ export default function ExamPage() {
   const [examAnswers, setExamAnswers] = useState<StudentAnswer[]>([])
   const [examTasks, setExamTasks] = useState<ExamTask[]>([])
   const [loading, setLoading] = useState(true)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+
+  async function deleteExam() {
+    if (!exam) return
+    setDeleting(true)
+    try {
+      await pb.collection('exams').delete(exam.id)
+      navigate('/journal')
+    } catch (e) {
+      console.error(e)
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
+  }
 
   useEffect(() => {
     if (!examId) return
@@ -131,6 +147,35 @@ export default function ExamPage() {
           <p className="text-sm text-gray-500 mt-0.5">
             {exam.date} · {exam.task_count} заданий · ID {exam.exam_id}
           </p>
+        </div>
+        <div className="flex items-center gap-2 mt-1">
+          {confirmDelete ? (
+            <>
+              <span className="text-sm text-red-600">Удалить без возврата?</span>
+              <button
+                onClick={() => void deleteExam()}
+                disabled={deleting}
+                className="btn-danger inline-flex items-center gap-1.5 text-sm px-3 py-1.5"
+              >
+                {deleting && <Loader2 size={13} className="animate-spin" />}
+                Да, удалить
+              </button>
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="btn-ghost text-sm px-3 py-1.5"
+              >
+                Отмена
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setConfirmDelete(true)}
+              className="btn-ghost text-red-500 hover:text-red-700 hover:bg-red-50 border border-red-200 inline-flex items-center gap-1.5 text-sm px-3 py-1.5"
+            >
+              <Trash2 size={14} />
+              Удалить
+            </button>
+          )}
         </div>
       </div>
 
