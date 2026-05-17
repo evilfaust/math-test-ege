@@ -13,6 +13,7 @@ import StudentReportPage from './pages/StudentReportPage'
 import ExamPage from './pages/ExamPage'
 import StatsPage from './pages/StatsPage'
 import UploadPage from './pages/UploadPage'
+import HomeworkPrintPage from './pages/HomeworkPrintPage'
 import SetupGuard from './components/SetupGuard'
 import GlobalSearch from './components/GlobalSearch'
 
@@ -131,6 +132,7 @@ function AppLayout() {
               <Route path="/exam/:examId" element={<ExamPage />} />
               <Route path="/stats" element={<StatsPage />} />
               <Route path="/upload" element={<UploadPage />} />
+              <Route path="/homework/:contextType/:contextId" element={<HomeworkPrintPage />} />
             </Routes>
           </main>
         </div>

@@ -33,7 +33,11 @@ if [ ! -f "./pb" ]; then
   exit 1
 fi
 
-# 2. Start PocketBase
+# 2. Build production bundle into pb_public/ so :8090 serves the latest UI
+echo "🛠  Building production bundle into pb_public/..."
+npx vite build >/dev/null
+
+# 3. Start PocketBase
 echo "🗄️  Starting PocketBase..."
 ./scripts/run-pocketbase.sh &
 PB_PID=$!

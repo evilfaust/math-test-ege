@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { pb, type Group, type Student, type Exam, type StudentResult, type StudentAnswer, type ExamTask, examUrl, problemUrl } from '../lib/pb'
 import { BookOpen, Users, FileText, AlertTriangle, Upload, ExternalLink, TrendingUp, Target, Radar } from 'lucide-react'
+import ScoreTrendChart from '../components/ScoreTrendChart'
 import { format, parse } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -58,6 +59,8 @@ interface WeakTaskInfo {
 export default function Dashboard() {
   const [groupInfos, setGroupInfos] = useState<GroupInfo[]>([])
   const [recentExams, setRecentExams] = useState<Exam[]>([])
+  const [trendExams, setTrendExams] = useState<Exam[]>([])
+  const [trendResults, setTrendResults] = useState<StudentResult[]>([])
   const [topDebtors, setTopDebtors] = useState<DebtorInfo[]>([])
   const [weakTasks, setWeakTasks] = useState<WeakTaskInfo[]>([])
   const [totalStudents, setTotalStudents] = useState(0)
@@ -121,6 +124,13 @@ export default function Dashboard() {
 
         setGroupInfos(infos)
         setRecentExams(exams.slice(0, 6))
+
+        // Trend: last 12 exams chronologically (exams already sorted by -date)
+        const recentTrendExams = exams.slice(0, 12)
+        setTrendExams(recentTrendExams)
+        const trendExamIds = new Set(recentTrendExams.map((e) => e.id))
+        setTrendResults(results.filter((r) => trendExamIds.has(r.exam)))
+
         setTotalStudents(students.length)
         setTotalExams(exams.length)
         setDebtCount(totalDebts)
@@ -246,6 +256,13 @@ export default function Dashboard() {
           <p className="text-sm text-gray-500 mt-0.5">Долгов</p>
         </Link>
       </div>
+
+      <ScoreTrendChart
+        results={trendResults}
+        exams={trendExams}
+        title="Динамика среднего балла"
+        emptyHint="Нужно минимум два теста с оценками, чтобы построить тренд."
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Groups with stats */}

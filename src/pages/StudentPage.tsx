@@ -6,7 +6,8 @@ import {
 import { pb, type Student, type Exam, type StudentResult, type StudentAnswer, type ExamTask, examUrl, problemUrl, filterIn } from '../lib/pb'
 import GradeCell from '../components/GradeCell'
 import StudentExamModal from '../components/StudentExamModal'
-import { ExternalLink, ArrowLeft, TrendingUp, Settings2, FileDown } from 'lucide-react'
+import { ExternalLink, ArrowLeft, TrendingUp, Settings2, FileDown, BookOpen } from 'lucide-react'
+import HomeworkModal from '../components/HomeworkModal'
 import { format, parse } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -134,6 +135,7 @@ export default function StudentPage() {
   const [selectedMonth, setSelectedMonth] = useState<string>('all')
 
   const [selectedExamId, setSelectedExamId] = useState<string | null>(null)
+  const [homeworkOpen, setHomeworkOpen] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -349,6 +351,14 @@ export default function StudentPage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2 print-hidden">
+          <button
+            className="btn-ghost border border-gray-200"
+            onClick={() => setHomeworkOpen(true)}
+            title="Собрать ДЗ из слабых заданий"
+          >
+            <BookOpen size={16} />
+            Собрать ДЗ
+          </button>
           <button
             className="btn-ghost"
             onClick={() => {
@@ -689,6 +699,16 @@ export default function StudentPage() {
           examId={selectedExamId}
         />
       )}
+
+      <HomeworkModal
+        open={homeworkOpen}
+        onClose={() => setHomeworkOpen(false)}
+        mode="student"
+        title={`ДЗ для ${student.name}`}
+        tasks={tasks}
+        answers={answers}
+        printUrl={({ type, n }) => `/homework/student/${student.id}?type=${type}&n=${n}`}
+      />
     </div>
   )
 }

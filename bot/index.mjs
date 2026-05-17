@@ -150,12 +150,30 @@ async function cmdDebts(periodKey, groupName) {
     )
 
   const title = `<b>${group.name}</b> — ${period.label}`
-  if (!rows.length) return title + '\n\n✅ Долгов нет.'
+  if (!rows.length) return [title + '\n\n✅ Долгов нет.']
 
-  return title + '\n\n' + rows.map(({ student, debts }) =>
-    `${student.name} — ${debts.length}: ` +
-    debts.map(e => `<a href="${SDAM_BASE}/test?id=${e.exam_id}">${examDate(e)}</a>`).join('; ')
-  ).join('\n\n')
+  // Telegram limits 100 entities (links) per message — split into chunks
+  const MAX_LINKS = 100
+  const messages = []
+  let chunk = []
+  let linkCount = 0
+
+  for (const { student, debts } of rows) {
+    if (linkCount + debts.length > MAX_LINKS && chunk.length) {
+      messages.push(chunk.join('\n\n'))
+      chunk = []
+      linkCount = 0
+    }
+    chunk.push(
+      `${student.name} — ${debts.length}: ` +
+      debts.map(e => `<a href="${SDAM_BASE}/test?id=${e.exam_id}">${examDate(e)}</a>`).join('; ')
+    )
+    linkCount += debts.length
+  }
+  if (chunk.length) messages.push(chunk.join('\n\n'))
+
+  messages[0] = title + '\n\n' + messages[0]
+  return messages
 }
 
 async function cmdScores(periodKey, groupName) {
@@ -270,8 +288,11 @@ function allowed(ctx) {
 async function handle(ctx, fn) {
   if (!allowed(ctx)) return
   try {
-    const text = await fn()
-    await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true })
+    const result = await fn()
+    const texts = Array.isArray(result) ? result : [result]
+    for (const text of texts) {
+      await ctx.reply(text, { parse_mode: 'HTML', disable_web_page_preview: true })
+    }
   } catch (err) {
     console.error('[bot] error:', err.message)
     await ctx.reply(`❌ Ошибка: ${err.message}`)

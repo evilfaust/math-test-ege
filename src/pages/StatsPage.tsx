@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
 import { pb, type Group, type Student, type Exam, type StudentResult, type StudentAnswer, problemUrl, examUrl, filterIn } from '../lib/pb'
-import { AlertTriangle, TrendingDown, Users, Copy, Check, X } from 'lucide-react'
-import { parseISO, startOfDay, subDays } from 'date-fns'
+import { AlertTriangle, TrendingDown, Users, Copy, Check, X, BookOpen } from 'lucide-react'
+import ScoreTrendChart from '../components/ScoreTrendChart'
+import HomeworkModal from '../components/HomeworkModal'
 
 interface DebtItem {
   student: Student
@@ -16,22 +17,6 @@ interface GroupStat {
   studentCount: number
   avgGrade: number
   passRate: number
-}
-
-interface StudentDebtReport {
-  student: Student
-  exams: Exam[]
-}
-
-interface GroupDebtReport {
-  group: Group
-  students: StudentDebtReport[]
-}
-
-interface DebtReportData {
-  groups: GroupDebtReport[]
-  copyText: string
-  copyHtml: string
 }
 
 function fmtDate(d: string) {
@@ -49,14 +34,6 @@ interface DebtModalState {
   exams: Exam[]
 }
 
-type ReportPeriodKey = 'week' | 'month' | 'all'
-
-const REPORT_PERIODS: { key: ReportPeriodKey; title: string }[] = [
-  { key: 'week', title: 'За неделю' },
-  { key: 'month', title: 'За месяц' },
-  { key: 'all', title: 'За всё время' },
-]
-
 export default function StatsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialGroup = searchParams.get('group') || 'all'
@@ -66,12 +43,12 @@ export default function StatsPage() {
   const [debts, setDebts] = useState<DebtItem[]>([])
   const [debtModal, setDebtModal] = useState<DebtModalState | null>(null)
   const [copied, setCopied] = useState(false)
-  const [reportCopied, setReportCopied] = useState(false)
-  const [selectedReportPeriod, setSelectedReportPeriod] = useState<ReportPeriodKey>('week')
+  const [homeworkOpen, setHomeworkOpen] = useState(false)
 
   // Tasks/Answers state
   const [tasks, setTasks] = useState<{ id: string; exam: string; task_number: number; problem_id: string }[]>([])
   const [answers, setAnswers] = useState<StudentAnswer[]>([])
+  const [results, setResults] = useState<StudentResult[]>([])
   const selectedMonth = 'all'
   const [exams, setExams] = useState<Exam[]>([])
 
@@ -116,6 +93,7 @@ export default function StatsPage() {
         setDebts([])
         setTasks([])
         setAnswers([])
+        setResults([])
         setLoading(false)
         return
       }
@@ -155,6 +133,7 @@ export default function StatsPage() {
       setTasks(tasks)
       setAnswers(answers)
       setExams(exams)
+      setResults(results)
 
       // ── Group stats ────────────────────────────────────────
       const gs: GroupStat[] = []
@@ -232,79 +211,6 @@ export default function StatsPage() {
 
   const top10Weak = weakTasks.slice(0, 10)
 
-  const debtReport = useMemo<DebtReportData>(() => {
-    const now = startOfDay(new Date())
-    const weekStart = subDays(now, 6)
-    const monthStart = subDays(now, 29)
-    const selectedGroups = selectedGroup === 'all'
-      ? groups
-      : groups.filter((group) => group.id === selectedGroup)
-
-    const isInPeriod = (exam: Exam, period: ReportPeriodKey) => {
-      if (period === 'all') return true
-      const examDate = startOfDay(parseISO(exam.date))
-      return examDate >= (period === 'week' ? weekStart : monthStart) && examDate <= now
-    }
-
-    const reportGroups: GroupDebtReport[] = selectedGroups.map((group) => {
-      const groupDebts = debts.filter((item) => item.exam.group === group.id)
-      const studentMap = new Map<string, StudentDebtReport>()
-
-      for (const item of groupDebts) {
-        if (!isInPeriod(item.exam, selectedReportPeriod)) continue
-        const current = studentMap.get(item.student.id) ?? { student: item.student, exams: [] }
-        current.exams.push(item.exam)
-        studentMap.set(item.student.id, current)
-      }
-
-      const students = [...studentMap.values()]
-        .map(({ student, exams }) => ({
-          student,
-          exams: [...exams].sort((a, b) => b.date.localeCompare(a.date)),
-        }))
-        .sort((a, b) => b.exams.length - a.exams.length || a.student.name.localeCompare(b.student.name, 'ru'))
-
-      return { group, students }
-    })
-
-    const copyText = reportGroups.map(({ group, students }) => {
-      const lines = students.length > 0
-        ? students.map(({ student, exams }) => {
-          const examParts = exams
-            .map((exam) => `${getExamDebtDate(exam)} (${examUrl(exam.exam_id)})`)
-            .join('; ')
-          return `${student.name} — ${exams.length}: ${examParts}.`
-        })
-        : ['Долгов нет.']
-
-      return [group.name, '', ...lines].join('\n')
-    }).join('\n\n')
-
-    const escapeHtml = (value: string) =>
-      value
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-
-    const copyHtml = reportGroups.map(({ group, students }) => {
-      const lines = students.length > 0
-        ? students.map(({ student, exams }) => {
-          const examParts = exams
-            .map((exam) => `<a href="${examUrl(exam.exam_id)}">${escapeHtml(getExamDebtDate(exam))}</a>`)
-            .join('; ')
-          return `<div>${escapeHtml(student.name)} — ${exams.length}: ${examParts}.</div>`
-        })
-        : ['<div>Долгов нет.</div>']
-
-      return `<div>${escapeHtml(group.name)}</div><br/>${lines.join('')}`
-    }).join('<br/><br/>')
-
-    return { groups: reportGroups, copyText, copyHtml }
-  }, [debts, groups, selectedGroup, selectedReportPeriod])
-
-  const selectedPeriodTitle = REPORT_PERIODS.find((period) => period.key === selectedReportPeriod)?.title ?? ''
-
   function openDebtModal(student: Student) {
     const studentExams = debts.filter((d) => d.student.id === student.id).map((d) => d.exam)
     setDebtModal({ student, exams: studentExams })
@@ -323,27 +229,7 @@ export default function StatsPage() {
     })
   }
 
-  function copyDebtReport() {
-    if (!debtReport.copyText) return
-    const finish = () => {
-      setReportCopied(true)
-      setTimeout(() => setReportCopied(false), 2000)
-    }
-
-    if (typeof ClipboardItem !== 'undefined') {
-      navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': new Blob([debtReport.copyText], { type: 'text/plain' }),
-          'text/html': new Blob([debtReport.copyHtml], { type: 'text/html' }),
-        }),
-      ]).then(finish).catch(() => {
-        navigator.clipboard.writeText(debtReport.copyText).then(finish)
-      })
-      return
-    }
-
-    navigator.clipboard.writeText(debtReport.copyText).then(finish)
-  }
+  const selectedGroupObj = selectedGroup === 'all' ? null : groups.find((g) => g.id === selectedGroup) ?? null
 
   return (
     <div className="space-y-6">
@@ -376,6 +262,15 @@ export default function StatsPage() {
             {g.name}
           </button>
         ))}
+        {selectedGroupObj && (
+          <button
+            onClick={() => setHomeworkOpen(true)}
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
+          >
+            <BookOpen size={15} />
+            Собрать ДЗ группе
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -420,7 +315,11 @@ export default function StatsPage() {
             </div>
           )}
 
-
+          <ScoreTrendChart
+            results={results}
+            exams={exams}
+            title={selectedGroup === 'all' ? 'Динамика среднего балла (все группы)' : 'Динамика среднего балла группы'}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Debts */}
@@ -533,88 +432,6 @@ export default function StatsPage() {
         </>
       )}
 
-                    {debtReport.copyText && (
-            <div className="card p-5">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h3 className="font-semibold text-gray-800">Отчёт по долгам для чата</h3>
-                  <p className="text-sm text-gray-400">
-                    Формируется по выбранному периоду. Ниже можно проверить долги по кликабельным датам.
-                  </p>
-                </div>
-                <button
-                  onClick={copyDebtReport}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-50 px-3 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100"
-                >
-                  {reportCopied ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
-                  {reportCopied ? 'Скопировано!' : 'Скопировать отчёт'}
-                </button>
-              </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {REPORT_PERIODS.map((period) => (
-                  <button
-                    key={period.key}
-                    onClick={() => {
-                      setSelectedReportPeriod(period.key)
-                      setReportCopied(false)
-                    }}
-                    className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-all ${
-                      selectedReportPeriod === period.key
-                        ? 'bg-brand-600 text-white'
-                        : 'bg-white border border-gray-200 text-gray-600 hover:border-brand-300'
-                    }`}
-                  >
-                    {period.title}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 rounded-xl border border-gray-200 bg-white">
-                <div className="border-b border-gray-100 px-4 py-3 text-sm font-medium text-gray-700">
-                  {selectedPeriodTitle}
-                </div>
-                <div className="max-h-[360px] space-y-4 overflow-y-auto px-4 py-4">
-                  {debtReport.groups.map(({ group, students }) => (
-                    <div key={group.id} className="space-y-2">
-                      <p className="text-sm font-semibold text-gray-800">{group.name}</p>
-                      {students.length > 0 ? (
-                        students.map(({ student, exams }) => (
-                          <div key={student.id} className="rounded-lg bg-gray-50 px-3 py-2">
-                            <p className="text-sm font-medium text-gray-800">
-                              {student.name}
-                              <span className="ml-2 text-xs font-normal text-gray-400">
-                                {exams.length} тест{exams.length === 1 ? '' : exams.length < 5 ? 'а' : 'ов'}
-                              </span>
-                            </p>
-                            <div className="mt-1 flex flex-wrap gap-2">
-                              {exams.map((exam) => (
-                                <a
-                                  key={exam.id}
-                                  href={examUrl(exam.exam_id)}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center rounded-md border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-medium text-brand-700 hover:bg-brand-100"
-                                >
-                                  {getExamDebtDate(exam)}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-sm text-gray-400">Долгов нет.</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <textarea
-                readOnly
-                value={debtReport.copyText}
-                className="mt-4 min-h-[320px] w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm leading-6 text-gray-700 outline-none"
-              />
-            </div>
-          )}
-
       {/* Debt modal */}
       {debtModal && (
         <div
@@ -667,6 +484,18 @@ export default function StatsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {selectedGroupObj && (
+        <HomeworkModal
+          open={homeworkOpen}
+          onClose={() => setHomeworkOpen(false)}
+          mode="group"
+          title={`ДЗ для группы ${selectedGroupObj.name}`}
+          tasks={tasks}
+          answers={answers}
+          printUrl={({ type, n }) => `/homework/group/${selectedGroupObj.id}?type=${type}&n=${n}`}
+        />
       )}
     </div>
   )
