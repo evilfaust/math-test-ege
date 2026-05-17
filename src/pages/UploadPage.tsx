@@ -146,8 +146,8 @@ export default function UploadPage() {
         className={`
           rounded-[28px] border-2 border-dashed p-12 text-center transition-all cursor-pointer
           ${dragging
-            ? 'border-brand-500 bg-brand-50'
-            : 'border-slate-300 bg-white/85 hover:border-brand-400 hover:bg-brand-50/40'
+            ? 'border-indigo-400 bg-indigo-50'
+            : 'border-slate-300 bg-white hover:border-indigo-300 hover:bg-indigo-50/30'
           }
         `}
       >
@@ -161,7 +161,7 @@ export default function UploadPage() {
         />
         <Upload
           size={42}
-          className={`mx-auto mb-4 ${dragging ? 'text-brand-500' : 'text-slate-400'}`}
+          className={`mx-auto mb-4 ${dragging ? 'text-indigo-500' : 'text-slate-400'}`}
         />
         <p className="text-lg font-semibold text-slate-800">
           Перетащите Excel-файлы сюда или выберите вручную
@@ -243,7 +243,7 @@ export default function UploadPage() {
                                       type="checkbox"
                                       checked={!excluded}
                                       onChange={() => toggleExamKey(fileState.file, key)}
-                                      className="rounded border-slate-300 text-brand-500 focus:ring-brand-400"
+                                      className="rounded border-slate-300 text-indigo-500 focus:ring-indigo-400"
                                     />
                                     <span className={`text-xs ${excluded ? 'line-through text-slate-300' : 'text-slate-600'}`}>
                                       {exam.label || exam.title}
@@ -284,14 +284,14 @@ export default function UploadPage() {
 
                 {fileState.status === 'importing' && (
                   <div className="mt-2 space-y-1.5">
-                    <div className="flex items-center gap-2 text-xs text-brand-600">
+                    <div className="flex items-center gap-2 text-xs text-indigo-600">
                       <Loader2 size={12} className="animate-spin" />
                       {fileState.progress?.stage ?? 'Импорт…'}
                     </div>
                     {fileState.progress && fileState.progress.total > 0 && (
                       <div className="h-1.5 overflow-hidden rounded-full bg-slate-100">
                         <div
-                          className="h-full rounded-full bg-brand-500 transition-all"
+                          className="h-full rounded-full bg-indigo-500 transition-all"
                           style={{ width: `${(fileState.progress.current / fileState.progress.total) * 100}%` }}
                         />
                       </div>

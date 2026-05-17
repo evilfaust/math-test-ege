@@ -1,8 +1,20 @@
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer, Cell } from 'recharts'
+import {
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from 'recharts'
 import { pb, type Group, type Student, type Exam, type StudentResult, type StudentAnswer, problemUrl, examUrl, filterIn } from '../lib/pb'
-import { AlertTriangle, TrendingDown, Users, Copy, Check, X, BookOpen } from 'lucide-react'
+import { AlertTriangle, TrendingDown, Users, Copy, Check, X, BookOpen, ExternalLink } from 'lucide-react'
 import ScoreTrendChart from '../components/ScoreTrendChart'
 import HomeworkModal from '../components/HomeworkModal'
 
@@ -34,6 +46,12 @@ interface DebtModalState {
   exams: Exam[]
 }
 
+function taskRateColor(rate: number) {
+  if (rate >= 0.6) return '#bef264'
+  if (rate >= 0.4) return '#fde68a'
+  return '#fca5a5'
+}
+
 export default function StatsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const initialGroup = searchParams.get('group') || 'all'
@@ -45,7 +63,6 @@ export default function StatsPage() {
   const [copied, setCopied] = useState(false)
   const [homeworkOpen, setHomeworkOpen] = useState(false)
 
-  // Tasks/Answers state
   const [tasks, setTasks] = useState<{ id: string; exam: string; task_number: number; problem_id: string }[]>([])
   const [answers, setAnswers] = useState<StudentAnswer[]>([])
   const [results, setResults] = useState<StudentResult[]>([])
@@ -59,7 +76,6 @@ export default function StatsPage() {
     pb.collection('groups').getFullList<Group>({ sort: 'name' }).then(setGroups).catch(console.error)
   }, [])
 
-  // Sync selectedGroup from URL when it changes externally
   useEffect(() => {
     const urlGroup = searchParams.get('group')
     if (urlGroup && urlGroup !== selectedGroup) {
@@ -113,7 +129,6 @@ export default function StatsPage() {
         }),
       ])
 
-      // ── Debts ────────────────────────────────────────────
       const resultMap = new Map<string, StudentResult>()
       for (const r of results) resultMap.set(`${r.student}__${r.exam}`, r)
 
@@ -121,7 +136,6 @@ export default function StatsPage() {
       for (const student of students) {
         for (const exam of exams.filter((e) => e.group === student.group)) {
           const r = resultMap.get(`${student.id}__${exam.id}`)
-          // Debt is when they didn't take it AND it hasn't been manually exempted
           if ((!r || r.did_not_take) && !r?.is_exempt) {
             debtList.push({ student, exam })
           }
@@ -129,13 +143,11 @@ export default function StatsPage() {
       }
       setDebts(debtList)
 
-      // Save to state for memoized filtering
       setTasks(tasks)
       setAnswers(answers)
       setExams(exams)
       setResults(results)
 
-      // ── Group stats ────────────────────────────────────────
       const gs: GroupStat[] = []
       const allGroups = selectedGroup === 'all' ? groups : groups.filter((g) => g.id === selectedGroup)
       for (const group of allGroups) {
@@ -172,13 +184,13 @@ export default function StatsPage() {
     }
   }
 
-  // Dedup debts by student for summary
   const debtsByStudent = new Map<string, { student: Student; count: number }>()
   for (const d of debts) {
     const cur = debtsByStudent.get(d.student.id) ?? { student: d.student, count: 0 }
     debtsByStudent.set(d.student.id, { ...cur, count: cur.count + 1 })
   }
   const sortedDebtors = [...debtsByStudent.values()].sort((a, b) => b.count - a.count)
+  const maxDebtCount = sortedDebtors[0]?.count ?? 1
 
   const weakTasks = useMemo(() => {
     const filteredAnswers = selectedMonth === 'all' ? answers : answers.filter(a => {
@@ -232,49 +244,48 @@ export default function StatsPage() {
   const selectedGroupObj = selectedGroup === 'all' ? null : groups.find((g) => g.id === selectedGroup) ?? null
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {/* Group filter */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => {
-            setSelectedGroup('all')
-            setSearchParams({})
-          }}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedGroup === 'all'
-            ? 'bg-brand-600 text-white'
-            : 'bg-white border border-gray-200 text-gray-600 hover:border-brand-300'
-            }`}
-        >
-          Все группы
-        </button>
-        {groups.map((g) => (
+      <div className="flex items-center gap-2 flex-wrap">
+        <div className="inline-flex bg-slate-100 rounded-lg p-0.5 gap-0.5">
           <button
-            key={g.id}
-            onClick={() => {
-              setSelectedGroup(g.id)
-              setSearchParams({ group: g.id })
-            }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${selectedGroup === g.id
-              ? 'bg-brand-600 text-white'
-              : 'bg-white border border-gray-200 text-gray-600 hover:border-brand-300'
-              }`}
+            onClick={() => { setSelectedGroup('all'); setSearchParams({}) }}
+            className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+              selectedGroup === 'all'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-500 hover:text-slate-700'
+            }`}
           >
-            {g.name}
+            Все группы
           </button>
-        ))}
+          {groups.map((g) => (
+            <button
+              key={g.id}
+              onClick={() => { setSelectedGroup(g.id); setSearchParams({ group: g.id }) }}
+              className={`px-3.5 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
+                selectedGroup === g.id
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-500 hover:text-slate-700'
+              }`}
+            >
+              {g.name}
+            </button>
+          ))}
+        </div>
+
         {selectedGroupObj && (
           <button
             onClick={() => setHomeworkOpen(true)}
-            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:border-brand-300 hover:bg-brand-50"
+            className="ml-auto inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-1.5 text-[13px] font-medium text-slate-700 transition-colors hover:bg-slate-50"
           >
-            <BookOpen size={15} />
+            <BookOpen size={14} />
             Собрать ДЗ группе
           </button>
         )}
       </div>
 
       {loading ? (
-        <div className="card p-8 text-center text-gray-400 animate-pulse">Загрузка…</div>
+        <div className="card p-10 text-center text-slate-400 text-[13px] animate-pulse">Загрузка…</div>
       ) : (
         <>
           {/* Group summary cards */}
@@ -283,30 +294,30 @@ export default function StatsPage() {
               {groupStats.map(({ group, examCount, studentCount, avgGrade, passRate }) => (
                 <div key={group.id} className="card p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <h3 className="font-semibold text-gray-800">{group.name}</h3>
-                    <span className="text-xs text-gray-400 flex items-center gap-1">
-                      <Users size={12} /> {studentCount}
+                    <h3 className="text-[14px] font-semibold text-slate-900">{group.name}</h3>
+                    <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                      <Users size={11} /> {studentCount}
                     </span>
                   </div>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between text-gray-600">
+                  <div className="space-y-2 text-[13px]">
+                    <div className="flex justify-between text-slate-500">
                       <span>Тестов проведено</span>
-                      <strong>{examCount}</strong>
+                      <span className="font-semibold text-slate-800">{examCount}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-slate-500">
                       <span>Средняя оценка</span>
-                      <strong className={avgGrade >= 4 ? 'text-emerald-600' : avgGrade >= 3 ? 'text-amber-600' : 'text-red-600'}>
+                      <span className={`font-semibold ${avgGrade >= 4 ? 'text-emerald-600' : avgGrade >= 3 ? 'text-amber-600' : 'text-rose-600'}`}>
                         {avgGrade.toFixed(2)}
-                      </strong>
+                      </span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-slate-500">
                       <span>Успеваемость</span>
-                      <strong>{Math.round(passRate * 100)}%</strong>
+                      <span className="font-semibold text-slate-800">{Math.round(passRate * 100)}%</span>
                     </div>
                   </div>
-                  <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div className="mt-3.5 h-1 bg-slate-100 rounded-full overflow-hidden">
                     <div
-                      className="h-full rounded-full bg-brand-500 transition-all"
+                      className="h-full rounded-full bg-indigo-500 transition-all"
                       style={{ width: `${passRate * 100}%` }}
                     />
                   </div>
@@ -315,100 +326,113 @@ export default function StatsPage() {
             </div>
           )}
 
+          {/* Score trend chart */}
           <ScoreTrendChart
             results={results}
             exams={exams}
             title={selectedGroup === 'all' ? 'Динамика среднего балла (все группы)' : 'Динамика среднего балла группы'}
           />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Debts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            {/* Debtors */}
             <div className="card overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <AlertTriangle size={16} className="text-amber-500" />
-                <h3 className="font-semibold text-gray-800">Должники</h3>
-                <span className="ml-auto text-xs text-gray-400">{sortedDebtors.length} студентов</span>
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <AlertTriangle size={15} className="text-rose-500" />
+                <span className="text-[13.5px] font-semibold text-slate-900">Должники</span>
+                <span className="ml-auto text-[11px] text-slate-400">{sortedDebtors.length} студентов</span>
               </div>
               {sortedDebtors.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">Долгов нет</div>
+                <div className="p-10 text-center text-slate-400 text-[13px]">Долгов нет</div>
               ) : (
-                <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
-                  {sortedDebtors.map(({ student, count }) => (
-                    <div key={student.id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50">
+                <div className="divide-y divide-slate-50 max-h-96 overflow-y-auto">
+                  {sortedDebtors.map(({ student, count }, i) => (
+                    <div key={student.id} className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
+                      <span className="w-5 text-[12px] text-slate-400 tabular-nums shrink-0">{i + 1}</span>
                       <Link
                         to={`/student/${student.id}`}
-                        className="text-sm font-medium text-gray-800 hover:text-brand-600"
+                        className="flex-1 text-[13.5px] font-medium text-slate-900 hover:text-indigo-600 transition-colors truncate"
                       >
                         {student.name}
                       </Link>
-                      <button
-                        onClick={() => openDebtModal(student)}
-                        className="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full font-medium hover:bg-red-100 transition-colors cursor-pointer"
-                      >
-                        {count} тест{count === 1 ? '' : count < 5 ? 'а' : 'ов'}
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-20 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-rose-400 rounded-full"
+                            style={{ width: `${(count / maxDebtCount) * 100}%` }}
+                          />
+                        </div>
+                        <button
+                          onClick={() => openDebtModal(student)}
+                          className="text-[11.5px] font-semibold text-rose-600 tabular-nums w-14 text-right hover:text-rose-700 transition-colors cursor-pointer"
+                        >
+                          {count} тест{count === 1 ? '' : count < 5 ? 'а' : 'ов'}
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Weak tasks */}
+            {/* Weak tasks bar chart */}
             <div className="card overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <TrendingDown size={16} className="text-red-500" />
-                <h3 className="font-semibold text-gray-800">Сложные задания</h3>
-                <span className="ml-auto text-xs text-gray-400">топ-10 по ошибкам</span>
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2">
+                <TrendingDown size={15} className="text-amber-500" />
+                <span className="text-[13.5px] font-semibold text-slate-900">Сложные задания</span>
+                <span className="ml-auto text-[11px] text-slate-400">топ-10 по ошибкам</span>
               </div>
               {top10Weak.length === 0 ? (
-                <div className="p-8 text-center text-gray-400 text-sm">Данных нет</div>
+                <div className="p-10 text-center text-slate-400 text-[13px]">Данных нет</div>
               ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart
-                    data={top10Weak}
-                    layout="vertical"
-                    margin={{ top: 10, right: 20, bottom: 10, left: 60 }}
-                    barSize={16}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" horizontal={false} />
-                    <XAxis
-                      type="number"
-                      tickFormatter={(v) => `${Math.round(v * 100)}%`}
-                      tick={{ fontSize: 10 }}
-                      domain={[0, 1]}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="task_number"
-                      tickFormatter={(v) => `Зад. ${v}`}
-                      tick={{ fontSize: 11 }}
-                      width={55}
-                    />
-                    <Tooltip
-                      contentStyle={{ fontSize: 12, borderRadius: 8 }}
-                      formatter={(v: number) => [`${Math.round(v * 100)}%`, 'Верно']}
-                      labelFormatter={(v) => `Задание ${v}`}
-                    />
-                    <Bar dataKey="rate" radius={[0, 4, 4, 0]}>
-                      {top10Weak.map((t) => (
-                        <Cell
-                          key={t.task_number}
-                          fill={t.rate >= 0.6 ? '#bef264' : t.rate >= 0.4 ? '#fde68a' : '#fca5a5'}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="px-4 py-4">
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart
+                      data={top10Weak}
+                      layout="vertical"
+                      margin={{ top: 4, right: 20, bottom: 4, left: 16 }}
+                      barSize={14}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+                      <XAxis
+                        type="number"
+                        tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                        tick={{ fontSize: 11, fill: '#94a3b8' }}
+                        domain={[0, 1]}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <YAxis
+                        type="category"
+                        dataKey="task_number"
+                        tickFormatter={(v) => `Зад. ${v}`}
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        width={60}
+                        axisLine={false}
+                        tickLine={false}
+                      />
+                      <Tooltip
+                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px -2px rgba(15,23,42,0.08)' }}
+                        formatter={(v: number) => [`${Math.round(v * 100)}%`, 'Верно']}
+                        labelFormatter={(v) => `Задание ${v}`}
+                        cursor={{ fill: '#f8fafc' }}
+                      />
+                      <Bar dataKey="rate" radius={[0, 4, 4, 0]}>
+                        {top10Weak.map((t) => (
+                          <Cell key={t.task_number} fill={taskRateColor(t.rate)} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               )}
             </div>
           </div>
 
-
-
-          {/* Problem links for hardest tasks */}
+          {/* Problem links */}
           {weakTasks.filter((t) => t.rate < 0.5).length > 0 && (
             <div className="card p-5">
-              <h3 className="font-semibold text-gray-800 mb-3">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-1">Слабые места</p>
+              <h3 className="text-[14px] font-semibold text-slate-900 mb-3">
                 Ссылки на задания с &lt;50% верных ответов
               </h3>
               <div className="flex flex-wrap gap-2">
@@ -420,10 +444,11 @@ export default function StatsPage() {
                       href={problemUrl(t.problem_id)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-3 py-2 text-sm bg-red-50 border border-red-200 text-red-700 rounded-lg hover:bg-red-100 transition-colors"
+                      className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border border-rose-200 bg-rose-50/60 hover:bg-rose-50 text-rose-700 text-[13px] font-medium transition-colors"
                     >
-                      <span className="font-bold">Задание {t.task_number}</span>
-                      <span className="text-red-400 text-xs">{Math.round(t.rate * 100)}%</span>
+                      <span className="font-semibold">Задание {t.task_number}</span>
+                      <span className="text-rose-500 text-[12px]">{Math.round(t.rate * 100)}%</span>
+                      <ExternalLink size={11} className="opacity-50" />
                     </a>
                   ))}
               </div>
@@ -439,33 +464,33 @@ export default function StatsPage() {
           onClick={() => setDebtModal(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden"
+            className="bg-white rounded-2xl shadow-pop w-full max-w-md mx-4 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
               <div>
-                <h3 className="font-semibold text-gray-800">{debtModal.student.name}</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
+                <h3 className="text-[14px] font-semibold text-slate-900">{debtModal.student.name}</h3>
+                <p className="text-[12px] text-slate-400 mt-0.5">
                   {debtModal.exams.length} незданных тест{debtModal.exams.length === 1 ? '' : debtModal.exams.length < 5 ? 'а' : 'ов'}
                 </p>
               </div>
               <button
                 onClick={() => setDebtModal(null)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="px-5 py-3 max-h-72 overflow-y-auto divide-y divide-gray-50">
+            <div className="px-5 py-2 max-h-72 overflow-y-auto divide-y divide-slate-50">
               {debtModal.exams.map((exam) => (
                 <div key={exam.id} className="flex items-center justify-between py-2.5 gap-3">
-                  <span className="text-sm text-gray-700 truncate">{getExamDebtDate(exam)}</span>
+                  <span className="text-[13px] text-slate-700 truncate">{getExamDebtDate(exam)}</span>
                   <a
                     href={examUrl(exam.exam_id)}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-brand-600 hover:underline whitespace-nowrap"
+                    className="text-[12px] text-indigo-600 hover:text-indigo-700 hover:underline whitespace-nowrap transition-colors"
                   >
                     Открыть →
                   </a>
@@ -473,12 +498,12 @@ export default function StatsPage() {
               ))}
             </div>
 
-            <div className="px-5 py-4 border-t border-gray-100">
+            <div className="px-5 py-4 border-t border-slate-100">
               <button
                 onClick={copyDebtList}
-                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-slate-50 hover:bg-slate-100 text-[13px] font-medium text-slate-700 transition-colors"
               >
-                {copied ? <Check size={15} className="text-emerald-500" /> : <Copy size={15} />}
+                {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
                 {copied ? 'Скопировано!' : 'Скопировать список со ссылками'}
               </button>
             </div>
