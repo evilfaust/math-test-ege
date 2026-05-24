@@ -6,7 +6,7 @@ import {
 import { pb, type Student, type Exam, type StudentResult, type StudentAnswer, type ExamTask, examUrl, problemUrl, filterIn } from '../lib/pb'
 import GradeCell from '../components/GradeCell'
 import StudentExamModal from '../components/StudentExamModal'
-import { ExternalLink, TrendingUp, Settings2, FileDown, BookOpen, CheckCircle2, AlertTriangle, Star } from 'lucide-react'
+import { ExternalLink, TrendingUp, Settings2, FileDown, BookOpen, CheckCircle2, AlertTriangle, Star, Send, Check, X as XIcon, Pencil } from 'lucide-react'
 import HomeworkModal from '../components/HomeworkModal'
 import { format, parse } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -110,6 +110,10 @@ export default function StudentPage() {
   const [homeworkOpen, setHomeworkOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [groupName, setGroupName] = useState('')
+  const [tgEditing, setTgEditing] = useState(false)
+  const [tgDraft, setTgDraft] = useState('')
+  const [tgSaving, setTgSaving] = useState(false)
+  const [tgError, setTgError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!studentId) return
@@ -230,6 +234,40 @@ export default function StudentPage() {
 
   const initials = student.name.split(' ').map((p) => p[0]).join('').slice(0, 2).toUpperCase()
 
+  const startEditTg = () => {
+    setTgDraft(student?.telegram_id ?? '')
+    setTgError(null)
+    setTgEditing(true)
+  }
+
+  const cancelEditTg = () => {
+    setTgEditing(false)
+    setTgError(null)
+  }
+
+  const saveTelegramId = async () => {
+    if (!studentId || !student) return
+    const trimmed = tgDraft.trim()
+    if (trimmed && !/^[0-9]+$/.test(trimmed)) {
+      setTgError('Только цифры (Telegram user_id)')
+      return
+    }
+    setTgSaving(true)
+    setTgError(null)
+    try {
+      const updated = await pb.collection('students').update<Student>(student.id, {
+        telegram_id: trimmed,
+      })
+      setStudent(updated)
+      setTgEditing(false)
+    } catch (e) {
+      console.error(e)
+      setTgError((e as Error).message)
+    } finally {
+      setTgSaving(false)
+    }
+  }
+
   const toggleExempt = async (r: StudentResult) => {
     if (!studentId) return
     try {
@@ -259,6 +297,59 @@ export default function StudentPage() {
               Студент{groupName ? ` · ${groupName}` : ''}
             </p>
             <h2 className="text-[24px] font-semibold text-slate-900 tracking-[-0.01em] mt-0.5">{student.name}</h2>
+            {/* Telegram ID */}
+            <div className="mt-1.5 flex items-center gap-2 text-[12px] text-slate-500 print-hidden">
+              <Send size={12} className="text-slate-400" />
+              {!tgEditing ? (
+                <>
+                  <span className="font-mono">
+                    {student.telegram_id ? student.telegram_id : <span className="italic text-slate-400">не привязан</span>}
+                  </span>
+                  <button
+                    onClick={startEditTg}
+                    className="text-slate-400 hover:text-indigo-600 p-0.5"
+                    title="Изменить Telegram ID"
+                  >
+                    <Pencil size={11} />
+                  </button>
+                </>
+              ) : (
+                <>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    value={tgDraft}
+                    onChange={(e) => setTgDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveTelegramId()
+                      if (e.key === 'Escape') cancelEditTg()
+                    }}
+                    placeholder="напр. 328497552"
+                    autoFocus
+                    disabled={tgSaving}
+                    className="px-2 py-0.5 border border-slate-300 rounded text-[12px] font-mono w-44 focus:outline-none focus:border-indigo-500"
+                  />
+                  <button
+                    onClick={saveTelegramId}
+                    disabled={tgSaving}
+                    className="text-emerald-600 hover:text-emerald-700 p-0.5 disabled:opacity-50"
+                    title="Сохранить"
+                  >
+                    <Check size={13} />
+                  </button>
+                  <button
+                    onClick={cancelEditTg}
+                    disabled={tgSaving}
+                    className="text-slate-400 hover:text-slate-600 p-0.5 disabled:opacity-50"
+                    title="Отмена"
+                  >
+                    <XIcon size={13} />
+                  </button>
+                  {tgError && <span className="text-rose-600 text-[11px] ml-1">{tgError}</span>}
+                </>
+              )}
+            </div>
             {/* Progress bar */}
             <div className="mt-4 max-w-md">
               <div className="flex items-center justify-between text-[11px] text-slate-500 mb-1.5">

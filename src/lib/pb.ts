@@ -19,6 +19,7 @@ export interface Student {
   id: string
   name: string
   group: string          // relation id
+  telegram_id?: string   // optional Telegram numeric user id (stored as string)
   expand?: { group?: Group }
   created: string
 }
